@@ -70,14 +70,9 @@ int main() {
     }
 
     // --- Send SET_AUTH_MANIFEST command ---
-    struct caliptra_mailbox_req set_manifest_req = {0};
-    struct caliptra_mailbox_resp set_manifest_resp = {0};
-    set_manifest_req.cmd = 0x46534D41; // 'AMSF' (SET_AUTH_MANIFEST) little-endian
-    // Set manifest data here
     struct caliptra_buffer manifest = read_file_or_exit("manifest.bin");
-    set_manifest_req.data = manifest.data;
-    set_manifest_req.data_size = manifest.len;
-    int status = caliptra_mailbox_send(&set_manifest_req, &set_manifest_resp);
+    struct caliptra_buffer manifest_resp = {0};
+    int status = caliptra_mailbox_execute(0x46534D41, &manifest, &manifest_resp, false); // 'AMSF'
     free((void*)manifest.data);
     if (status != 0) {
         printf("SET_AUTH_MANIFEST command failed: %d\n", status);
@@ -86,14 +81,9 @@ int main() {
     printf("Manifest sent and accepted.\n");
 
     // --- Send AUTHORIZE_AND_STASH command ---
-    struct caliptra_mailbox_req auth_stash_req = {0};
-    struct caliptra_mailbox_resp auth_stash_resp = {0};
-    auth_stash_req.cmd = 0x48535441; // 'ATSH' (AUTHORIZE_AND_STASH) little-endian
-    // Set image data here
     struct caliptra_buffer image = read_file_or_exit("image.bin");
-    auth_stash_req.data = image.data;
-    auth_stash_req.data_size = image.len;
-    status = caliptra_mailbox_send(&auth_stash_req, &auth_stash_resp);
+    struct caliptra_buffer image_resp = {0};
+    status = caliptra_mailbox_execute(0x48535441, &image, &image_resp, false); // 'ATSH'
     free((void*)image.data);
     if (status != 0) {
         printf("AUTHORIZE_AND_STASH command failed: %d\n", status);

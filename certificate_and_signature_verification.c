@@ -134,11 +134,8 @@ int main() {
     // Signature cannot be directly obtained from the certificate, so set dummy values here
     memset(verify_req.signature_r, 0, sizeof(verify_req.signature_r));
     memset(verify_req.signature_s, 0, sizeof(verify_req.signature_s));
-    // Message
-    const char *message = "Test message";
-    memcpy(verify_req.msg, message, strlen(message));
-    verify_req.msg_len = strlen(message);
-
+    // caliptra_ecdsa_verify_req にはメッセージ本体のフィールドがないため、署名検証APIの使い方を確認・修正する必要があります。
+    // ここではAPI呼び出し例として空のリクエストを送る形に修正します。
     int verify_status = caliptra_ecdsa384_verify(&verify_req, false);
     if (verify_status != 0) {
         printf("Signature verification failed: %d\n", verify_status);
