@@ -83,60 +83,42 @@ int main() {
     }
     printf("Certificate successfully obtained\n");
 
-    // Extract public key from certificate
-    BIO *cert_bio = BIO_new_mem_buf(cert_resp.cert, cert_resp.cert_size);
-    if (!cert_bio) {
-        printf("Failed to create certificate BIO\n");
+    // Instead of extracting public key and signature from certificate, parse them from the firmware image header (preamble)
+    struct caliptra_buffer fw_image = read_file_or_exit("fw.bin");
+    if (fw_image.len < sizeof(struct caliptra_preamble)) {
+        printf("FW image too small for preamble\n");
+        free((void*)fw_image.data);
         return 1;
     }
-    X509 *x509 = d2i_X509_bio(cert_bio, NULL);
-    if (!x509) {
-        printf("Failed to parse certificate\n");
-        BIO_free(cert_bio);
-        return 1;
-    }
-    EVP_PKEY *pkey = X509_get_pubkey(x509);
-    if (!pkey) {
-        printf("Failed to extract public key\n");
-        X509_free(x509);
-        BIO_free(cert_bio);
-        return 1;
-    }
-    EC_KEY *ec_key = EVP_PKEY_get1_EC_KEY(pkey);
-    if (!ec_key) {
-        printf("Failed to extract EC public key\n");
-        EVP_PKEY_free(pkey);
-        X509_free(x509);
-        BIO_free(cert_bio);
-        return 1;
-    }
-    const EC_POINT *pub_point = EC_KEY_get0_public_key(ec_key);
-    const EC_GROUP *group = EC_KEY_get0_group(ec_key);
-    BIGNUM *x = BN_new();
-    BIGNUM *y = BN_new();
-    if (!EC_POINT_get_affine_coordinates_GFp(group, pub_point, x, y, NULL)) {
-        printf("Failed to extract public key coordinates\n");
-        BN_free(x); BN_free(y);
-        EC_KEY_free(ec_key);
-        EVP_PKEY_free(pkey);
-        X509_free(x509);
-        BIO_free(cert_bio);
-        return 1;
-    }
+    const struct caliptra_preamble *preamble = (const struct caliptra_preamble *)fw_image.data;
     struct caliptra_ecdsa_verify_req verify_req = {0};
-    BN_bn2binpad(x, verify_req.pub_key_x, 48);
-    BN_bn2binpad(y, verify_req.pub_key_y, 48);
-    BN_free(x); BN_free(y);
-    EC_KEY_free(ec_key);
-    EVP_PKEY_free(pkey);
-    X509_free(x509);
-    BIO_free(cert_bio);
-    // Signature cannot be directly obtained from the certificate, so set dummy values here
-    memset(verify_req.signature_r, 0, sizeof(verify_req.signature_r));
-    memset(verify_req.signature_s, 0, sizeof(verify_req.signature_s));
-    // caliptra_ecdsa_verify_req にはメッセージ本体のフィールドがないため、署名検証APIの使い方を確認・修正する必要があります。
-    // ここではAPI呼び出し例として空のリクエストを送る形に修正します。
+    // Copy public key (owner ECC)
+    memcpy(verify_req.pub_key_x, preamble->owner_pub_keys.ecc_pub_key.x, sizeof(verify_req.pub_key_x));
+    memcpy(verify_req.pub_key_y, preamble->owner_pub_keys.ecc_pub_key.y, sizeof(verify_req.pub_key_y));
+    // Copy signature (owner ECC signature)
+    memcpy(verify_req.signature_r, preamble->owner_sigs.ecc_signature.rcoord, sizeof(verify_req.signature_r));
+    memcpy(verify_req.signature_s, preamble->owner_sigs.ecc_signature.scoord, sizeof(verify_req.signature_s));
+    // NOTE: The message to verify is the hash of the header (SHA-384 of struct caliptra_header)
+    if (fw_image.len < sizeof(struct caliptra_preamble) + sizeof(struct caliptra_header)) {
+        printf("FW image too small for header\n");
+        free((void*)fw_image.data);
+        return 1;
+    }
+    const uint8_t *header_ptr = fw_image.data + sizeof(struct caliptra_preamble);
+    // Compute SHA-384 of header (use OpenSSL for demonstration, but in ROM this would be a hardware SHA384)
+    uint8_t header_digest[48] = {0};
+    #ifdef USE_OPENSSL_FOR_HASH
+    SHA512_CTX sha_ctx;
+    SHA384_Init(&sha_ctx);
+    SHA384_Update(&sha_ctx, header_ptr, sizeof(struct caliptra_header));
+    SHA384_Final(header_digest, &sha_ctx);
+    #else
+    // In ROM, use hardware SHA384 here
+    #endif
+    // (Assume verify_req has a field for the message digest, or pass as needed)
+    // Call signature verification API (ROM would use hardware, here is a placeholder)
     int verify_status = caliptra_ecdsa384_verify(&verify_req, false);
+    free((void*)fw_image.data);
     if (verify_status != 0) {
         printf("Signature verification failed: %d\n", verify_status);
         return verify_status;

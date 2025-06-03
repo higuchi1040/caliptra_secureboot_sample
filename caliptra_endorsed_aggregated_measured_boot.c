@@ -41,15 +41,15 @@ static struct caliptra_buffer read_file_or_exit(const char* path) {
 }
 
 int main() {
-    // SoC起動コード: libcaliptraのAPIでCaliptraを初期化
+    // SoC boot code: Initialize Caliptra using libcaliptra APIs
     struct caliptra_fuses fuses = {0};
-    // 必要に応じてfuse値をセット
+    // Set fuse values as needed
     if (caliptra_init_fuses(&fuses) != 0) {
         printf("Failed to initialize Caliptra fuses\n");
         return 1;
     }
 
-    // Caliptra BootFSM開始
+    // Start Caliptra BootFSM
     if (caliptra_bootfsm_go() != 0) {
         printf("Failed to start Caliptra BootFSM\n");
         return 1;
@@ -57,7 +57,7 @@ int main() {
     caliptra_set_wdt_timeout(0xA0000000);
     caliptra_configure_itrng_entropy(0x1, 0xFFFF, 0xFFFF);
 
-    // ファームウェアイメージのロード
+    // Load firmware image
     struct caliptra_buffer fw = read_file_or_exit("fw.bin");
     if (caliptra_upload_fw(&fw, false) != 0) {
         printf("Failed to load FW image\n");
@@ -94,7 +94,7 @@ int main() {
     for (int i = 0; i < 48; ++i) printf("%02x", quote_resp.digest[i]);
     printf("\n");
 
-    // 3. Verify the aggregated signature (省略)
+    // 3. Verify the aggregated signature (omitted)
     printf("Aggregated measured boot attestation complete.\n");
     return 0;
 }

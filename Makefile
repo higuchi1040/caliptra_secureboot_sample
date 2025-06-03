@@ -3,26 +3,29 @@ Q=@
 CC=gcc
 AR=ar
 
-TARGET=caliptra_endorsed_aggregated_measured_boot
-SOURCE = caliptra_endorsed_aggregated_measured_boot.c caliptra_manifest_authorize_and_stash_sample.c certificate_and_signature_verification.c caliptra_if_host_stubs.c
+SAMPLES = caliptra_endorsed_aggregated_measured_boot caliptra_manifest_authorize_and_stash_sample certificate_and_signature_verification
 
 LIBCALIPTRA_ROOT = ../../../
 LIBCALIPTRA_INC  = ../../inc
 LIBCALIPTRA_LIB  = ../../
 
-OBJS := $(patsubst %.c,%.o, $(filter %.c,$(SOURCE)))
-
-# INCLUDES
 INCLUDES += -I$(LIBCALIPTRA_INC) -I./
-
 CFLAGS += $(INCLUDES) -Wall
 LDFLAGS += -L$(LIBCALIPTRA_LIB) -Wl,-rpath=$(LIBCALIPTRA_LIB) -lcaliptra -lssl -lcrypto
 
-.PHONY: all clean
+.PHONY: all clean $(SAMPLES)
 
-all: $(TARGET)
+all: $(SAMPLES)
 
-$(TARGET): $(OBJS)
+caliptra_endorsed_aggregated_measured_boot: caliptra_endorsed_aggregated_measured_boot.o caliptra_if_host_stubs.o
+	@echo [LINK] $@
+	$(Q)$(CC) -o $@ $^ $(LDFLAGS)
+
+caliptra_manifest_authorize_and_stash_sample: caliptra_manifest_authorize_and_stash_sample.o caliptra_if_host_stubs.o
+	@echo [LINK] $@
+	$(Q)$(CC) -o $@ $^ $(LDFLAGS)
+
+certificate_and_signature_verification: certificate_and_signature_verification.o caliptra_if_host_stubs.o
 	@echo [LINK] $@
 	$(Q)$(CC) -o $@ $^ $(LDFLAGS)
 
@@ -31,5 +34,5 @@ $(TARGET): $(OBJS)
 	$(Q)$(CC) $(CFLAGS) -g -c $< -o $@
 
 clean:
-	@echo [CLEAN] $(OBJS) $(TARGET)
-	$(Q)rm -f $(OBJS) $(TARGET)
+	@echo [CLEAN] *.o $(SAMPLES)
+	$(Q)rm -f *.o $(SAMPLES)
